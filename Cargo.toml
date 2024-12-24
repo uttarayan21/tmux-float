@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.23", features = ["derive", "unstable-v5"] }
 clap_complete = { version = "4.5.40", features = ["unstable-dynamic"] }
+error-stack = "0.5.0"

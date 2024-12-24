@@ -1,3 +1,4 @@
+use error_stack::*;
 use std::{
     path::{Path, PathBuf},
     process::Stdio,
@@ -11,14 +12,14 @@ pub enum Actions {
         #[arg(short, long, default_value = "scratch")]
         session: String,
         /// Whether to change the working directory to current directory on attaching
-        #[arg(short, long)]
+        #[arg(short, long, default_value = "true")]
         cwd: bool,
     },
     Attach {
         #[arg(short, long, default_value = "scratch")]
         session: String,
         /// Whether to change the working directory to current directory on attaching
-        #[arg(short, long)]
+        #[arg(short, long, default_value = "true")]
         cwd: bool,
     },
     Detach {
@@ -37,13 +38,13 @@ impl Actions {
         let tmux = Tmux::new("tmux");
         match self {
             Actions::Toggle { session, cwd } => {
-                tmux.toggle_session(&session, *cwd)?;
+                tmux.toggle_session(session, *cwd)?;
             }
             Actions::Attach { session, cwd } => {
-                tmux.attach_session(&session, *cwd)?;
+                tmux.attach_session(session, *cwd)?;
             }
             Actions::Detach { session } => {
-                tmux.detach_session(&session)?;
+                tmux.detach_session(session)?;
             }
         }
         Ok(())
@@ -76,21 +77,28 @@ impl Tmux {
     pub fn has_session(&self, name: impl AsRef<str>) -> Result<bool, std::io::Error> {
         let output = self
             .command()
-            .args(&["has-session", "-t", name.as_ref()])
+            .args(["has-session", "-t", name.as_ref()])
             .output()?;
         Ok(output.status.success())
     }
 
     pub fn create_session(&self, name: impl AsRef<str>) -> Result<(), std::io::Error> {
         self.command()
-            .args(&["new-session", "-d", "-s", name.as_ref()])
+            .args(["new-session", "-d", "-s", name.as_ref()])
             .spawn()?;
         Ok(())
     }
 
     pub fn attach_session(&self, name: impl AsRef<str>, cwd: bool) -> Result<(), std::io::Error> {
         let name = name.as_ref();
-        let attach_command = format!("tmux attach-session -t {name}  -c '#{{pane_current_path}}'");
+
+        let attach_command = format!(
+            "tmux attach-session -t {name}{cwd}",
+            cwd = cwd
+                .then_some(format!(" -c {}", self.var("#{pane_current_path}")?))
+                .unwrap_or_default()
+        );
+
         if !self.has_session(name)? {
             self.create_session(name)?;
         }
@@ -101,7 +109,7 @@ impl Tmux {
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
-            .args(&[
+            .args([
                 "popup",
                 "-d",
                 "'#{pane_current_path}'",
@@ -118,7 +126,7 @@ impl Tmux {
 
     pub fn detach_session(&self, name: impl AsRef<str>) -> Result<(), std::io::Error> {
         self.command()
-            .args(&["detach", "-s", name.as_ref()])
+            .args(["detach", "-s", name.as_ref()])
             .spawn()?;
         Ok(())
     }
@@ -126,7 +134,7 @@ impl Tmux {
     pub fn is_attached(&self, name: impl AsRef<str>) -> Result<bool, std::io::Error> {
         let output = self
             .command()
-            .args(&["display-message", "-p", "-F", "#{session_name}"])
+            .args(["display-message", "-p", "-F", "#{session_name}"])
             .output()?;
         if output.status.success() {
             let session_name = String::from_utf8(output.stdout).unwrap();
@@ -134,5 +142,15 @@ impl Tmux {
         } else {
             Ok(false)
         }
+    }
+
+    pub fn var(&self, name: impl AsRef<str>) -> Result<String, std::io::Error> {
+        let output = self
+            .command()
+            .args(["display-message", "-p", "-F", name.as_ref()])
+            .output()?;
+        String::from_utf8(output.stdout).change_context_lazy(|| {
+            std::io::Error::new(std::io::ErrorKind::Other, "Failed to get var")
+        })
     }
 }
