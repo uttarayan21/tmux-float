@@ -1,0 +1,8 @@
+[package]
+name = "tmux-float"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.23", features = ["derive", "unstable-v5"] }
+clap_complete = { version = "4.5.40", features = ["unstable-dynamic"] }
