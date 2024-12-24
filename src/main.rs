@@ -132,16 +132,11 @@ impl Tmux {
     }
 
     pub fn is_attached(&self, name: impl AsRef<str>) -> Result<bool, std::io::Error> {
-        let output = self
-            .command()
-            .args(["display-message", "-p", "-F", "#{session_name}"])
-            .output()?;
-        if output.status.success() {
-            let session_name = String::from_utf8(output.stdout).unwrap();
-            Ok(session_name.trim() == name.as_ref())
-        } else {
-            Ok(false)
-        }
+        self.var("#{session_name}")
+            .change_context_lazy(|| {
+                std::io::Error::new(std::io::ErrorKind::Other, "Failed to get var")
+            })
+            .map(|session_name| session_name.trim() == name.as_ref())
     }
 
     pub fn var(&self, name: impl AsRef<str>) -> Result<String, std::io::Error> {
@@ -149,6 +144,7 @@ impl Tmux {
             .command()
             .args(["display-message", "-p", "-F", name.as_ref()])
             .output()?;
+        assert!(output.status.success());
         String::from_utf8(output.stdout).change_context_lazy(|| {
             std::io::Error::new(std::io::ErrorKind::Other, "Failed to get var")
         })
