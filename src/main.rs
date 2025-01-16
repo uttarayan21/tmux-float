@@ -105,22 +105,33 @@ impl Tmux {
         if self.is_attached(name)? {
             return Ok(());
         }
-        self.command()
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .args([
-                "popup",
-                "-d",
-                "'#{pane_current_path}'",
-                "-xC",
-                "-yC",
-                "-w95%",
-                "-h95%",
-                "-E",
-                &attach_command,
-            ])
-            .spawn()?;
+        if Self::is_inside_tmux() {
+            self.command()
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .args([
+                    "popup",
+                    "-d",
+                    "'#{pane_current_path}'",
+                    "-xC",
+                    "-yC",
+                    "-w95%",
+                    "-h95%",
+                    "-E",
+                    &attach_command,
+                ])
+                .spawn()?;
+        } else {
+            self.command()
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .args(["popup", "-d"])
+                .arg(std::env::current_dir().attach_printable("Failed to get current dir")?)
+                .args(["-xC", "-yC", "-w95%", "-h95%", "-E", &attach_command])
+                .spawn()?;
+        }
         Ok(())
     }
 
@@ -129,6 +140,10 @@ impl Tmux {
             .args(["detach", "-s", name.as_ref()])
             .spawn()?;
         Ok(())
+    }
+
+    pub fn is_inside_tmux() -> bool {
+        std::env::var_os("TMUX").map_or(false, |_| true)
     }
 
     pub fn is_attached(&self, name: impl AsRef<str>) -> Result<bool, std::io::Error> {
