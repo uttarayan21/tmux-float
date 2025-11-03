@@ -86,6 +86,7 @@ impl Tmux {
         self.command()
             .args(["new-session", "-d", "-s", name.as_ref()])
             .spawn()?;
+        self.attach_session(name, true)?;
         Ok(())
     }
 
