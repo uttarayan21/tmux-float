@@ -72,12 +72,12 @@
             # ];
             buildInputs = with pkgs;
               []
-              ++ (lib.optionals pkgs.stdenv.isDarwin [
+              ++ (lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
                 libiconv
                 # darwin.apple_sdk.frameworks.Metal
               ]);
           }
-          // (lib.optionalAttrs pkgs.stdenv.isLinux {
+          // (lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             # BINDGEN_EXTRA_CLANG_ARGS = "-I${pkgs.llvmPackages.libclang.lib}/lib/clang/18/include";
           });
         cargoArtifacts = craneLib.buildPackage commonArgs;
@@ -110,7 +110,7 @@
                 partitionType = "count";
               });
           }
-          // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+          // lib.optionalAttrs (!pkgs.stdenv.hostPlatform.isDarwin) {
             tmux-float-llvm-cov = craneLibLLvmTools.cargoLlvmCov (commonArgs // {inherit cargoArtifacts;});
           };
 
@@ -127,7 +127,7 @@
                 cargo-nextest
                 cargo-deny
               ]
-              ++ (lib.optionals pkgs.stdenv.isDarwin [
+              ++ (lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
                 # darwin.apple_sdk.frameworks.Metal
               ]);
           };
